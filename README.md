@@ -1,34 +1,51 @@
 # ProbeDesign10X
 
-Custom probe design utilities for 10x Genomics Visium and Chromium Flex (v1 + GEM‑X Flex v2), with optional NCBI BLAST off‑target screening and helpers for visualization and ordering.
+Probe design utilities for 10x Genomics Visium and Chromium Flex (v1 and GEM-X Flex v2). It designs split 50-nt probes, can optionally screen for off-targets using NCBI BLAST, and provides helpers for plotting and IDT oPools ordering.
 
-## Features
-- Design split 50‑nt probes (25/25) for Visium and Flex.
-- Flex v2 support (GEM‑X) with correct RHS constants.
-- Optional NCBI remote BLAST screening (no local BLAST dependency).
-- Multi‑FASTA support with automatic concatenation.
-- Matplotlib layout plotter.
-- Export to IDT oPools order format.
+## Input options
 
-## Requirements
-- Python 3.10+
-- `pandas`
-- Optional: `matplotlib` (for plotting)
+You can provide sequence input in two ways:
 
-## Quick Start (Python)
+1) A single sequence string (5'->3' mRNA-like) using `design_custom_probes(...)`
+2) A FASTA path (single or multi-record) using `design_custom_probes_from_fasta(...)`
+
+Multi-FASTA behavior:
+- Each record is designed independently.
+- Results are concatenated into one DataFrame.
+- `sequence_id` is added when more than one record is present.
+- Probe IDs are prefixed by the FASTA header unless `probe_name_prefix` is supplied.
+
+Key assay settings:
+- `assay`: `visium` or `flex`
+- Visium: `version` = `v1`, `v2`, or `hd`
+- Flex: `flex_version` = `v1` or `v2`
+  - v1: `flex_mode` = `singleplex` or `multiplex`
+  - v1 multiplex only: `flex_barcode` = `BC001`..`BC016`
+  - v2: `flex_v2_rhs` = `pconst` or `pcs1`
+
+Design knobs you might care about:
+- `max_probes`, `min_spacing`
+- `gc_min`, `gc_max`
+- `ligation_requires_a` (TN ligation constraint; default True)
+- `auto_three_probes` (force 3 well-spaced probes, emphasize GC near 50%)
+
+Off-target screening (optional):
+- `blast_for_offtarget=True` to enable NCBI remote BLAST
+- `blast_organism` can be `human`, `mouse`, or any Entrez query string
+- `blast_max_hits` controls filtering
+- `blast_cache_path` caches results to avoid re-querying
+
+## Examples
+
+### 1) Basic Visium design (Python)
 ```python
 from ProbeDesign10X import design_custom_probes
 
 seq = "ACTG..."  # 5'->3' mRNA-like sequence
-df = design_custom_probes(
-    seq,
-    assay="visium",
-    version="hd",
-    max_probes=12,
-)
+df = design_custom_probes(seq, assay="visium", version="hd", max_probes=12)
 ```
 
-### Flex v2 example
+### 2) Flex v2 design (Python)
 ```python
 df = design_custom_probes(
     seq,
@@ -39,7 +56,7 @@ df = design_custom_probes(
 )
 ```
 
-### Multi‑FASTA
+### 3) Multi-FASTA (Python)
 ```python
 from ProbeDesign10X import design_custom_probes_from_fasta
 
@@ -50,7 +67,7 @@ df = design_custom_probes_from_fasta(
 )
 ```
 
-### Off‑target BLAST screening
+### 4) Off-target BLAST screening (Python)
 ```python
 df = design_custom_probes(
     seq,
@@ -63,35 +80,15 @@ df = design_custom_probes(
 )
 ```
 
-### Plotting
-```python
-from ProbeDesign10X import plot_probe_hybridization
-
-ax = plot_probe_hybridization(df, seq_len=len(seq), max_probes_to_plot=50)
+### 5) Command line (FASTA input)
+```bash
+python ProbeDesign10X.py targets.fa --assay visium --version hd --out probes.csv
 ```
 
-### IDT oPools export
+### 6) Plotting and IDT oPools export
 ```python
-from ProbeDesign10X import to_idt_opools
+from ProbeDesign10X import plot_probe_hybridization, to_idt_opools
 
+plot_probe_hybridization(df, seq_len=len(seq), max_probes_to_plot=50)
 opools_df = to_idt_opools(df, pool_name="poolOne")
 ```
-
-## CLI Usage
-```bash
-python ProbeDesign10X.py my_targets.fa --assay visium --version hd --out probes.csv
-```
-
-Common flags:
-- `--assay visium|flex`
-- `--version v1|v2|hd` (Visium)
-- `--flex-version v1|v2`
-- `--flex-mode singleplex|multiplex`
-- `--blast` to enable NCBI BLAST screening
-- `--blast-organism human|mouse|<entrez query>`
-- `--plot output.png` (single‑record FASTA only)
-
-## Notes
-- The ligation constraint (A at position 25) is enforced by default; disable with `ligation_requires_a=False` or `--no-ligation-constraint`.
-- BLAST screening uses NCBI’s remote API; rate limits apply.
-- Flex v2 RHS constant can be set to `pconst` or `pcs1` for the Human/Mouse 4 Samples Kit.
