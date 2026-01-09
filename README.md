@@ -18,16 +18,17 @@ Multi-FASTA behavior:
 Key assay settings:
 - `assay`: `visium` or `flex`
 - Visium: `version` = `v1`, `v2`, or `hd`
-- Flex: `flex_version` = `v1` or `v2`
+- Flex: `flex_version` = `v1`, `v2`, or `v2_4plex`
   - v1: `flex_mode` = `singleplex` or `multiplex`
   - v1 multiplex only: `flex_barcode` = `BC001`..`BC016`
-  - v2: `flex_v2_rhs` = `pconst` or `pcs1`
+  - v2: pConst RHS (standard singleplex/multiplex)
+  - v2_4plex: pCS1 RHS (4-sample kit)
 
 Design knobs you might care about:
 - `max_probes`, `min_spacing`
 - `gc_min`, `gc_max`
 - `ligation_requires_a` (TN ligation constraint; default True)
-- `auto_three_probes` (force 3 well-spaced probes, emphasize GC near 50%)
+- `auto_pick` (force 3 well-spaced probes, emphasize GC near 50%)
 
 Off-target screening (optional):
 - `blast_for_offtarget=True` to enable NCBI remote BLAST
@@ -52,7 +53,6 @@ df = design_custom_probes(
     assay="flex",
     flex_version="v2",
     flex_mode="singleplex",
-    flex_v2_rhs="pconst",
 )
 ```
 

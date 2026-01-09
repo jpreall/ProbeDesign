@@ -298,8 +298,7 @@ def design_custom_probes(
     assay: str,                         # "visium" or "flex"
     version: str | None = None,         # e.g. "v1"/"v2"/"hd" for visium; ignored for flex in this doc
     flex_mode: str | None = None,       # "singleplex" or "multiplex" (required if assay="flex")
-    flex_version: str | None = None,    # "v1" or "v2" (only if assay="flex")
-    flex_v2_rhs: str = "pconst",        # "pconst" or "pcs1" (only if flex_version="v2")
+    flex_version: str | None = None,    # "v1", "v2", or "v2_4plex" (only if assay="flex")
     flex_barcode: str = "BC001",        # for multiplex: BC001..BC016; for singleplex ignored
     probe_len: int = 50,
     split: int = 25,
@@ -331,6 +330,7 @@ def design_custom_probes(
     Key design constraint for Visium: LHS probe's 3' base must be T, meaning seg1[-1] on the input must be A.  [oai_citation:5‡Cloudinary](https://cdn.10xgenomics.com/image/upload/v1729114202/support-documents/CG000621_CustomProbeDesign_RevD.pdf)
 
     Flex v2 (GEM-X) uses different RHS constant sequences and omits barcodes/NNs.
+    Use flex_version="v2_4plex" to apply the pCS1 RHS for the 4-sample kit.
 
     Off-target screening (optional) uses NCBI remote BLAST. Set blast_for_offtarget=True
     and provide blast_organism (e.g., "human" or "mouse") to constrain results.
@@ -348,11 +348,11 @@ def design_custom_probes(
         if flex_version is None:
             flex_version = "v1"
         flex_version = flex_version.lower()
-        if flex_version not in {"v1", "v2"}:
-            raise ValueError("For assay='flex', flex_version should be 'v1' or 'v2'.")
+        if flex_version not in {"v1", "v2", "v2_4plex"}:
+            raise ValueError("For assay='flex', flex_version should be 'v1', 'v2', or 'v2_4plex'.")
 
         if flex_mode is None:
-            flex_mode = "singleplex" if flex_version == "v2" else None
+            flex_mode = "singleplex" if flex_version in {"v2", "v2_4plex"} else None
         if flex_mode is None or flex_mode.lower() not in {"singleplex", "multiplex"}:
             raise ValueError("For assay='flex', set flex_mode to 'singleplex' or 'multiplex'.")
         flex_mode = flex_mode.lower()
@@ -360,10 +360,6 @@ def design_custom_probes(
         if flex_version == "v1":
             if flex_mode == "multiplex" and flex_barcode not in FLEX_MULTIPLEX_BARCODES:
                 raise ValueError("flex_barcode must be one of BC001..BC016 for multiplex.")
-        else:
-            flex_v2_rhs = flex_v2_rhs.lower()
-            if flex_v2_rhs not in {"pconst", "pcs1"}:
-                raise ValueError("flex_v2_rhs must be 'pconst' or 'pcs1' for flex v2.")
     else:
         # Visium v1/v2/HD share the same ordering structure in this tech note  [oai_citation:6‡Cloudinary](https://cdn.10xgenomics.com/image/upload/v1729114202/support-documents/CG000621_CustomProbeDesign_RevD.pdf)
         if version is not None:
@@ -511,13 +507,12 @@ def design_custom_probes(
         else:
             lhs_oligo = f"{VISIUM_LHS_PREFIX}{p.lhs_target}"
             rhs_5phos = True
-            if flex_version == "v2":
-                if flex_v2_rhs == "pconst":
-                    rhs_const = FLEX_V2_RHS_PCONST
-                else:
-                    rhs_const = FLEX_V2_RHS_PCS1
+            if flex_version in {"v2", "v2_4plex"}:
+                rhs_const = FLEX_V2_RHS_PCS1 if flex_version == "v2_4plex" else FLEX_V2_RHS_PCONST
                 rhs_oligo = f"{p.rhs_target}{rhs_const}"
                 rhs_note = "/5Phos/ required; GEM-X Flex v2"
+                if flex_version == "v2_4plex":
+                    rhs_note = "/5Phos/ required; GEM-X Flex v2 4-sample kit"
             else:
                 # Flex ordering format (singleplex/multiplex)  [oai_citation:9‡Cloudinary](https://cdn.10xgenomics.com/image/upload/v1729114202/support-documents/CG000621_CustomProbeDesign_RevD.pdf)
                 if flex_mode == "singleplex":
@@ -571,7 +566,6 @@ def design_custom_probes_from_fasta(
     version: str | None = None,
     flex_mode: str | None = None,
     flex_version: str | None = None,
-    flex_v2_rhs: str = "pconst",
     flex_barcode: str = "BC001",
     probe_len: int = 50,
     split: int = 25,
@@ -580,6 +574,7 @@ def design_custom_probes_from_fasta(
     max_homopolymer: int = 6,
     min_spacing: int = 50,
     max_probes: int = 12,
+    auto_pick: bool = True,
     nn: str = "NN",
     blast_for_offtarget: bool = False,
     blast_dbs: tuple[str, ...] = ("nt", "refseq_rna"),
@@ -605,7 +600,6 @@ def design_custom_probes_from_fasta(
             version=version,
             flex_version=flex_version,
             flex_mode=flex_mode,
-            flex_v2_rhs=flex_v2_rhs,
             flex_barcode=flex_barcode,
             probe_len=probe_len,
             split=split,
@@ -614,6 +608,7 @@ def design_custom_probes_from_fasta(
             max_homopolymer=max_homopolymer,
             min_spacing=min_spacing,
             max_probes=max_probes,
+            auto_pick=auto_pick,
             nn=nn,
             blast_for_offtarget=blast_for_offtarget,
             blast_dbs=blast_dbs,
@@ -731,7 +726,13 @@ def to_idt_opools(
 #     assay="flex",
 #     flex_version="v2",
 #     flex_mode="singleplex",
-#     flex_v2_rhs="pconst",
+#     max_probes=12,
+# )
+# flex_v2_4plex_df = design_custom_probes(
+#     seq,
+#     assay="flex",
+#     flex_version="v2_4plex",
+#     flex_mode="singleplex",
 #     max_probes=12,
 # )
 # visium_df.to_csv("custom_probes_visium.csv", index=False)
@@ -745,9 +746,8 @@ if __name__ == "__main__":
     parser.add_argument("fasta", help="Input FASTA with a single sequence.")
     parser.add_argument("--assay", required=True, choices=["visium", "flex"])
     parser.add_argument("--version", choices=["v1", "v2", "hd"])
-    parser.add_argument("--flex-version", choices=["v1", "v2"])
+    parser.add_argument("--flex-version", choices=["v1", "v2", "v2_4plex"])
     parser.add_argument("--flex-mode", choices=["singleplex", "multiplex"])
-    parser.add_argument("--flex-v2-rhs", choices=["pconst", "pcs1"], default="pconst")
     parser.add_argument("--flex-barcode", default="BC001")
     parser.add_argument("--probe-name-prefix")
     parser.add_argument("--max-probes", type=int, default=12)
@@ -774,7 +774,6 @@ if __name__ == "__main__":
         version=args.version,
         flex_version=args.flex_version,
         flex_mode=args.flex_mode,
-        flex_v2_rhs=args.flex_v2_rhs,
         flex_barcode=args.flex_barcode,
         max_probes=args.max_probes,
         min_spacing=args.min_spacing,
