@@ -384,12 +384,12 @@ def design_custom_probes(
         seg1 = window[:split]
         seg2 = window[split:]
 
-        # Visium ligation-junction constraint: LHS 3' base must be T ⇒ input seg1[-1] must be A  [oai_citation:7‡Cloudinary](https://cdn.10xgenomics.com/image/upload/v1729114202/support-documents/CG000621_CustomProbeDesign_RevD.pdf)
-        if ligation_requires_a and seg1[-1] != "A":
-            continue
-
         lhs_target = revcomp(seg1)
         rhs_target = revcomp(seg2)
+
+        # Ligation-junction constraint: LHS 3' base (25th in probe) must be T.  [oai_citation:7‡Cloudinary](https://cdn.10xgenomics.com/image/upload/v1729114202/support-documents/CG000621_CustomProbeDesign_RevD.pdf)
+        if ligation_requires_a and lhs_target[-1] != "T":
+            continue
 
         gc_l = _gc_frac(lhs_target)
         gc_r = _gc_frac(rhs_target)
