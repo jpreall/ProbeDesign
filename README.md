@@ -1,5 +1,7 @@
 # ProbeDesign10X
 
+<p><strong><a href="https://jpreall.github.io/ProbeMaker/" style="font-size: 1.4em;">Try the browser version</a></strong></p>
+
 Probe design utilities for 10x Genomics Visium and Chromium Flex (v1 and GEM-X Flex v2). It designs split 50-nt probes, can optionally screen for off-targets using NCBI BLAST, and provides helpers for plotting and IDT oPools ordering.
 
 ## Input options
