@@ -94,3 +94,5 @@ from ProbeDesign10X import plot_probe_hybridization, to_idt_opools
 plot_probe_hybridization(df, seq_len=len(seq), max_probes_to_plot=50)
 opools_df = to_idt_opools(df, pool_name="poolOne")
 ```
+
+License: MIT
